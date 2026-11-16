@@ -16,6 +16,7 @@
     <h1>ポケモン手持ち管理</h1>
     <nav class="tabs" role="tablist">
       <button role="tab" data-view="list" aria-selected="true">手持ち</button>
+      <button role="tab" data-view="compare">比較</button>
       <button role="tab" data-view="import">取り込み</button>
       <button role="tab" data-view="data">データ</button>
     </nav>
@@ -66,6 +67,26 @@
       </div>
       <ul id="list" class="cards"></ul>
       <p class="center"><button id="more" hidden>もっと見る</button></p>
+    </section>
+
+    <!-- 比較 -->
+    <section id="view-compare" class="view" hidden>
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <label>対象
+            <select id="recent">
+              <option value="days:3">3日以内に捕まえた</option>
+              <option value="days:7">7日以内に捕まえた</option>
+              <option value="days:14">14日以内に捕まえた</option>
+              <option value="days:30">30日以内に捕まえた</option>
+              <option value="last-import">最後の取り込みで新しく追加された</option>
+            </select>
+          </label>
+        </div>
+        <p class="muted small">同じ進化先（シャドウは別扱い）の手持ちの中で、何番目かを表示します。</p>
+        <p id="compare-count" class="muted"></p>
+      </div>
+      <ul id="compare" class="cmp-list"></ul>
     </section>
 
     <!-- 取り込み -->

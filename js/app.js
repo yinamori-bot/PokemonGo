@@ -1,6 +1,7 @@
 import { csvToObjects } from './csv.js';
 import { LEAGUES, SHADOW_LABEL, validateHeader } from './pokegenie.js';
 import * as store from './store.js';
+import { buildGroups, pickRecent, compareOne } from './compare.js';
 
 const $ = s => document.querySelector(s);
 const PAGE = 60;
@@ -123,6 +124,64 @@ function loadFilters() {
   } catch {}
 }
 
+// ---- compare ----------------------------------------------------------
+const SHOW_TOP = 5;
+
+function memberRow(m, lk, self, idx) {
+  const l = m.leagues[lk];
+  const isSelf = m === self;
+  const name = `${esc(m.name)}${m.shadow === 2 ? '（リ）' : ''}${m.lucky ? '（キラ）' : ''}${isSelf ? '<span class="new-tag">これ</span>' : ''}`;
+  const date = m.catchDate ? m.catchDate.slice(2).replace(/-/g, '/') : '不明';
+  return `<tr class="${isSelf ? 'self' : ''}"><td>${l.rank ?? '—'}位</td><td class="nm">${name}</td>
+    <td>${m.cp ?? '?'}</td><td>${m.atk}/${m.def}/${m.sta}</td><td>${date}</td></tr>`;
+}
+
+function cmpLeague(row, p) {
+  if (row.missing) return `<div class="cmp-league muted small">${row.label}：データなし</div>`;
+  const target = row.target && row.target !== p.name ? ` → ${esc(row.target)}${row.targetForm && row.targetForm !== 'ノーマル' ? `（${esc(row.targetForm)}）` : ''}` : '';
+  const posCls = row.position === 1 ? 'r-gold' : 'r-low';
+  const posText = row.total === 1 ? '手持ちはこれだけ' : `手持ち${row.total}匹中 ${row.position}番目`;
+  const idx = row.members.indexOf(p);
+  const rows = [];
+  row.members.forEach((m, i) => {
+    if (i < SHOW_TOP || i === idx) {
+      if (i === idx && idx > SHOW_TOP) rows.push('<tr class="gap"><td colspan="5">⋯</td></tr>');
+      rows.push(memberRow(m, row.key, p, i + 1));
+    }
+  });
+  if (row.members.length > Math.max(SHOW_TOP, idx + 1)) rows.push(`<tr class="gap"><td colspan="5">ほか ${row.members.length - Math.max(SHOW_TOP, idx + 1)}匹</td></tr>`);
+  return `<details class="cmp-league" ${row.total > 1 ? 'open' : ''}>
+    <summary><span class="lname">${row.label}</span><span class="lrank">${row.rank ?? '—'}位</span><span class="muted small">${target}</span>
+      <span class="pos ${posCls}">${posText}</span></summary>
+    <table class="mtable"><thead><tr><th>順位</th><th>名前</th><th>CP</th><th>個体値</th><th>捕まえた日</th></tr></thead>
+    <tbody>${rows.join('')}</tbody></table>
+  </details>`;
+}
+
+function renderCompare() {
+  const owned = state.pokemon.filter(p => p.status !== 'removed');
+  const groups = buildGroups(owned);
+  const recent = pickRecent(owned, state.imports, $('#recent').value)
+    .sort((a, b) => (b.catchDate || '').localeCompare(a.catchDate || '') || a.dex - b.dex);
+  $('#compare-count').textContent = recent.length ? `${recent.length}匹` : '対象のポケモンがいません。「対象」を変えてみてください。';
+  $('#compare').innerHTML = recent.map(p => {
+    const badges = [];
+    if (p.form) badges.push(`<span class="badge b-form">${esc(p.form)}</span>`);
+    if (p.shadow) badges.push(`<span class="badge ${p.shadow === 1 ? 'b-shadow' : 'b-pure'}">${SHADOW_LABEL[p.shadow]}</span>`);
+    if (p.lucky) badges.push('<span class="badge b-lucky">キラ</span>');
+    return `<li class="card">
+      <div class="card-head"><span class="card-name">${esc(p.name)}</span><span class="dex">No.${p.dex}</span>${badges.join('')}
+        <span class="card-cp">CP ${p.cp ?? '?'}</span></div>
+      <div class="stats"><span>個体値 <b>${p.atk}/${p.def}/${p.sta}</b>（${p.ivPct ?? '?'}%）</span><span>捕まえた日 <b>${p.catchDate || '不明'}</b></span></div>
+      ${compareOne(p, groups).map(r => cmpLeague(r, p)).join('')}
+    </li>`;
+  }).join('');
+}
+$('#recent').addEventListener('input', () => {
+  renderCompare();
+  try { localStorage.setItem('recent', $('#recent').value); } catch {}
+});
+
 // ---- import -----------------------------------------------------------
 function renderHistory() {
   $('#history').innerHTML = state.imports.slice().reverse().map(i =>
@@ -183,10 +242,11 @@ $('#wipe').addEventListener('click', async () => {
 });
 
 // ---- boot -------------------------------------------------------------
-function renderAll() { renderList(); renderHistory(); }
+function renderAll() { renderList(); renderCompare(); renderHistory(); }
 
 (async function boot() {
   loadFilters();
+  try { const r = localStorage.getItem('recent'); if (r) $('#recent').value = r; } catch {}
   try { const v = localStorage.getItem('view'); if (v) showView(v); } catch {}
   state = await store.loadState();
   renderAll();
