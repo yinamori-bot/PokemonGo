@@ -1,0 +1,4 @@
+# Personal Pokémon data must never be committed
+*.csv
+*backup*.json
+node_modules/

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f6feb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>ポケモン手持ち管理</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner">
+    <h1>ポケモン手持ち管理</h1>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-view="list" aria-selected="true">手持ち</button>
+      <button role="tab" data-view="import">取り込み</button>
+      <button role="tab" data-view="data">データ</button>
+    </nav>
+  </div></header>
+
+  <main>
+    <!-- 手持ち一覧 -->
+    <section id="view-list" class="view">
+      <div class="toolbar">
+        <input id="q" type="search" placeholder="名前・進化先で検索（例：ネンドール）" autocomplete="off">
+        <div class="toolbar-row">
+          <label>並び順
+            <select id="sort">
+              <option value="G">スーパー順位</option>
+              <option value="U">ハイパー順位</option>
+              <option value="L">リトル順位</option>
+              <option value="iv">個体値</option>
+              <option value="cp">CP</option>
+              <option value="dex">図鑑番号</option>
+              <option value="catch">捕まえた日（新しい順）</option>
+              <option value="scan">スキャン日（新しい順）</option>
+            </select>
+          </label>
+          <label>上位
+            <select id="topN">
+              <option value="">すべて</option>
+              <option value="10">10位以内</option>
+              <option value="100">100位以内</option>
+              <option value="500">500位以内</option>
+            </select>
+          </label>
+          <label>種別
+            <select id="kind">
+              <option value="">すべて</option>
+              <option value="shadow">シャドウ</option>
+              <option value="purified">リトレーン</option>
+              <option value="lucky">キラ</option>
+              <option value="hundo">個体値100%</option>
+              <option value="dup">重複の疑い</option>
+            </select>
+          </label>
+        </div>
+        <p id="count" class="muted"></p>
+      </div>
+      <div id="empty" class="empty" hidden>
+        <p>まだデータがありません。</p>
+        <p><button class="primary" data-goto="import">Poke GenieのCSVを取り込む</button></p>
+      </div>
+      <ul id="list" class="cards"></ul>
+      <p class="center"><button id="more" hidden>もっと見る</button></p>
+    </section>
+
+    <!-- 取り込み -->
+    <section id="view-import" class="view" hidden>
+      <div class="panel">
+        <h2>Poke GenieのCSVを取り込む</h2>
+        <ol class="steps">
+          <li>Poke Genieでポケモンをスキャンする</li>
+          <li>Poke GenieでCSVを書き出す（iCloud Driveなどに保存）</li>
+          <li>下のボタンからそのCSVを選ぶ</li>
+        </ol>
+        <label id="drop" class="drop">
+          <input id="file" type="file" accept=".csv,text/csv" hidden>
+          <span class="drop-main">CSVファイルを選ぶ</span>
+          <span class="muted">PCではここにドラッグ＆ドロップもできます</span>
+        </label>
+        <p class="muted small">ファイルはこの端末のブラウザの中だけで読み込みます。どこにも送信しません。</p>
+        <div id="import-result"></div>
+      </div>
+      <div class="panel">
+        <h2>取り込みの履歴</h2>
+        <ul id="history" class="history"></ul>
+      </div>
+    </section>
+
+    <!-- データ -->
+    <section id="view-data" class="view" hidden>
+      <div class="panel">
+        <h2>バックアップ</h2>
+        <p class="muted">データはこの端末のブラウザに保存されています。スマホとPCでデータを移すときや、念のための保存に使います。</p>
+        <div class="btns">
+          <button id="backup" class="primary">バックアップを保存</button>
+          <label class="button">バックアップから復元<input id="restore" type="file" accept=".json,application/json" hidden></label>
+        </div>
+      </div>
+      <div class="panel danger">
+        <h2>すべて削除</h2>
+        <p class="muted">この端末に保存した手持ちデータと取り込み履歴をすべて消します。</p>
+        <button id="wipe" class="danger-btn">すべて削除</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
