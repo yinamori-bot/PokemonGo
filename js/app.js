@@ -51,7 +51,7 @@ function judgeBlock(p) {
       ${d.name ? `<span class="nick">${esc(d.name)}</span><button class="copy" data-copy="${esc(d.name)}">コピー</button>` : ''}
       <span class="muted small">${esc(d.reasons.join('・'))}${d.chosen && d.chosen.stage > 0 ? `（${esc(d.chosen.sp.ja)}に進化）` : ''}</span>`;
   } else if (d.decision === 'transfer') {
-    head = `<span class="verdict v-transfer">送る候補</span><span class="muted small">${esc(d.reasons.join('・'))}</span>`;
+    head = `<span class="verdict v-transfer">送る候補</span><span class="muted small">名前はそのまま・${esc(d.reasons.join('・'))}</span>`;
   } else {
     head = `<span class="verdict v-unknown">判定できません</span><span class="muted small">${esc(d.error || '')}</span>`;
   }
@@ -60,6 +60,8 @@ function judgeBlock(p) {
       <td>${o.rank}位${o.purifiedRank != null ? `→${o.purifiedRank}位` : ''}</td><td>${o.fits ? (o.rank <= TOP || (o.purifiedRank ?? 99) <= TOP ? '◎' : '') : 'CP超過'}</td></tr>`).join('');
   return `<div class="judge">
     <div class="judge-head">${head}</div>
+    ${d.legacy?.length ? `<div class="small">レガシー技：<b>${esc(d.legacy.join('、'))}</b></div>` : ''}
+    ${(d.notes || []).map(n => `<div class="small warn-text">${esc(n)}</div>`).join('')}
     <div class="flags">${chips}</div>
     ${rows ? `<details class="opts"><summary>リーグ別の順位（進化後を含む）</summary>
       <table class="mtable"><thead><tr><th>ポケモン</th><th>リーグ</th><th>順位</th><th></th></tr></thead><tbody>${rows}</tbody></table></details>` : ''}
@@ -82,7 +84,11 @@ document.addEventListener('click', async e => {
   if (f) {
     const p = state.pokemon.find(x => x.id === f.dataset.id);
     if (!p) return;
-    p.flags = { ...(p.flags || {}), [f.dataset.flag]: !(p.flags?.[f.dataset.flag]) };
+    const key = f.dataset.flag;
+    p.flags = { ...(p.flags || {}), [key]: !(p.flags?.[key]) };
+    // XXL and XXS cannot both be true.
+    if (p.flags[key] && key === 'xxl') p.flags.xxs = false;
+    if (p.flags[key] && key === 'xxs') p.flags.xxl = false;
     decisions.delete(p.id);
     await store.savePokemon(p);
     renderList(); renderCompare();

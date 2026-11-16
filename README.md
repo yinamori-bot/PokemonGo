@@ -14,13 +14,23 @@ Poke GenieのCSVを取り込んで、手持ちのポケモンをリーグ別の�
 
 ## 残す・送るの判定と名前
 
-1. どこかのリーグ・カップで50位以内に入れば「残す」。進化後の順位も見るが、進化後も今のレベルでCP上限に収まる必要がある。
-2. 複数で50位以内なら、いちばん進化した形を優先。同じ進化段階なら ML > HL > SL > LC の順。
-3. 名前は `ML③` のようにリーグ＋丸数字。シャドウがMLに入る場合は `ML239→㊵`（今の順位→リトレーン後の順位）。
-4. 色違い・ダイマックス・キョダイマックス・でんせつ・まぼろし・フィールド効果は無条件で残す。50位以内に入らない場合、色違いは `＊`、それ以外は `ML123`（1000位以下は `999+`）。
-5. リトルカップは、まだ進化しておらず、これから進化できるポケモンだけが対象。
+**リーグ・カップへの所属**
+- どこかのリーグ・カップで50位以内に入れば所属。進化後の順位も見るが、進化後も今のレベルでCP上限に収まる必要がある。
+- 複数で50位以内なら、いちばん進化した形を優先。同じ進化段階なら ML > HL > SL > LC の順。
+- レベル40超えは、常にマスターリーグとして `PL` ＋順位（`PL③`、`PL123`）。
+- リトルカップは、まだ進化しておらず、これから進化できるポケモンだけが対象。
 
-色違い・ダイマックス・キョダイマックス・フィールド効果はCSVに出ないため、カードのボタンで手動で印をつける。
+**名前** ＝ リーグ＋順位 ＋ レガシー技の頭文字 ＋ `＊`（色違い） ＋ `XXL`/`XXS`
+- 例：`ML③`、`ML③ブ`、`ML⑧＊`、`ML③XXL`
+- 順位：50位以内は丸数字、それ以外は数字、1000位以下は `999+`
+- シャドウがMLに所属する場合：`ML239→㊵`（今の順位→リトレーン後の順位）
+
+**どのリーグ・カップにも所属しない場合**
+- 色違い・XXL・XXS・2017年以前に捕まえた：`＊`、`XXL`、`2017` など
+- ダイマックス・キョダイマックス・でんせつ・まぼろし・フィールド効果：`ML123` の形
+- どれにも当てはまらない：送る候補（名前はそのまま）
+
+色違い・ダイマックス・キョダイマックス・フィールド効果・XXL・XXSはCSVに出ないため、カードのボタンで手動で印をつける。レガシー技はゲームデータから自動で判定する。
 
 順位はPvPokeと同じ方法で計算する（CP上限以下の最も高いレベルでのステータス積の順位。同じ値は同じ順位）。最大レベルは「データ」タブで設定でき、初期値はPoke Genieの設定に合わせて40。
 
@@ -29,7 +39,9 @@ Poke GenieのCSVを取り込んで、手持ちのポケモンをリーグ別の�
 ```
 curl -o gm.json https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/gamemaster.json
 curl -o names.csv https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_species_names.csv
-python3 tools/build_data.py gm.json names.csv data/pokedex.json
+curl -o moves.csv https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/moves.csv
+curl -o move_names.csv https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/move_names.csv
+python3 tools/build_data.py gm.json names.csv moves.csv move_names.csv data/pokedex.json
 ```
 
 ## ローカルで動かす
