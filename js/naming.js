@@ -5,16 +5,23 @@
 //    as it is or after evolving (the evolved form must still fit the CP cap
 //    at the current level). Most evolved form wins; then ML > HL > SL > LC.
 //  - Level above 40: always Master League, written "PL" + rank (PL③, PL123).
+//  - Little Cup: only Pokémon that have not evolved and can still evolve.
 //
-// Name = <league><rank> + <legacy move initials> + <＊ if shiny> + <XXL/XXS>
+// Name = <league><rank><stage mark> + <legacy initials> + <＊> + <XXL/XXS> + <year>
 //  - rank: circled within 50 (ML③), digits otherwise, 1000 or worse -> 999+.
+//  - stage mark (HL/SL/LC, families with evolutions): ♳ ♴ ♵ = stage 1/2/3
+//    of the form the rank is for (SL②♴).
 //  - Shadow in ML: <current rank>→<rank after purification> (ML239→㊵).
-//  - Not in any league:
-//      shiny / XXL / XXS / caught in 2017 or earlier -> "＊", "XXL", "2017" ...
-//      Dynamax, Gigantamax, legendary, mythical, background -> ML123 style
-//      nothing special -> transfer candidate, name stays the species name.
+//  - year: caught in 2017 or earlier (ML③2017).
+//
+// Not in any league
+//  - caught in 2017 or earlier          -> trade candidate, name = year (2017)
+//  - legacy move / Dynamax / Gigantamax / legendary / mythical / background
+//                                        -> keep, best rank anywhere (ML128ガ)
+//  - shiny / XXL / XXS only              -> keep, ＊ / XXL / XXS
+//  - nothing                             -> transfer, name stays as is
 import { LEAGUE_DEFS, rankOf, cpAt } from './ranking.js';
-import { resolve, evolutionLine } from './dex.js';
+import { resolve, evolutionLine, absoluteStage } from './dex.js';
 
 export const TOP = 50;
 export const LEAGUE_ORDER = ['ML', 'HL', 'SL', 'LC'];
@@ -74,10 +81,23 @@ const byPriority = (a, b) =>
   LEAGUE_ORDER.indexOf(a.league) - LEAGUE_ORDER.indexOf(b.league) ||
   Math.min(a.rank, a.purifiedRank ?? Infinity) - Math.min(b.rank, b.purifiedRank ?? Infinity);
 
-function rankText(o, prefix) {
-  if (o.purifiedRank != null) return `${prefix}${fmtRank(o.rank)}→${fmtRank(o.purifiedRank)}`;
-  return `${prefix}${fmtRank(o.rank)}`;
+const STAGE_MARKS = ['♳', '♴', '♵'];
+
+// ♳♴♵ for HL/SL/LC when the family has evolutions.
+export function stageMark(o) {
+  if (o.league === 'ML') return '';
+  if (!o.sp.parent && !o.sp.evos?.length) return '';
+  return STAGE_MARKS[absoluteStage(o.sp)] || '';
 }
+
+function rankText(o, prefix = o.league) {
+  if (o.purifiedRank != null) return `${prefix}${fmtRank(o.rank)}→${fmtRank(o.purifiedRank)}`;
+  return `${prefix}${fmtRank(o.rank)}${stageMark(o)}`;
+}
+
+// Best rank anywhere, for Pokémon kept without belonging to a league.
+const byRank = (a, b) =>
+  Math.min(a.rank, a.purifiedRank ?? Infinity) - Math.min(b.rank, b.purifiedRank ?? Infinity) || byPriority(a, b);
 
 // First character of each legacy move the Pokémon knows (ブラストバーン -> ブ).
 export function legacyMoves(p, self) {
@@ -101,7 +121,7 @@ export function specialReasons(p, self) {
 
 const catchYear = p => (p.catchDate ? Number(p.catchDate.slice(0, 4)) : null);
 
-// Returns { decision: 'keep'|'transfer'|'unknown', name, chosen, reasons, notes, options }
+// Returns { decision: 'keep'|'trade'|'transfer'|'unknown', name, chosen, reasons, notes, options }
 export function decide(p, settings) {
   const ev = evaluate(p, settings);
   if (ev.error) return { decision: 'unknown', error: ev.error, reasons: [], notes: [], options: [] };
@@ -111,41 +131,42 @@ export function decide(p, settings) {
   const marks = (f.shiny ? '＊' : '') + (f.xxl ? 'XXL' : f.xxs ? 'XXS' : '');
   const level = p.levelMin ?? p.levelMax;
   const year = catchYear(p);
+  const old = year != null && year <= OLD_YEAR;
   const notes = [];
   if (!p.catchDate) notes.push('捕まえた日が不明なため、2017年以前かどうか判定できません');
   const finish = r => {
     if (r.name && [...r.name].length > MAX_NICK) notes.push(`名前が${MAX_NICK}文字を超えています`);
     return { ...r, notes, legacy, options: ev.options };
   };
-  const withExtras = base => base + legacy.map(m => m[0]).join('') + marks;
-  const bestFit = () => ev.options.filter(o => o.fits).sort(byPriority);
+  const legacyText = legacy.map(m => m[0]).join('');
+  const full = base => base + legacyText + marks + (old ? String(year) : '');
+  const why = first => [first, ...(legacy.length ? ['レガシー技'] : []), ...special, ...(old ? [`${year}年に捕まえた`] : [])];
+  const fitting = ev.options.filter(o => o.fits);
 
   // Level above 40: Master League, "PL" prefix.
   if (level != null && level > 40) {
-    const chosen = bestFit().find(o => o.league === 'ML');
-    if (chosen) {
-      return finish({ decision: 'keep', name: withExtras(rankText(chosen, 'PL')), chosen,
-        reasons: ['レベル40超え', ...(legacy.length ? ['レガシー技'] : []), ...special] });
-    }
+    const chosen = fitting.slice().sort(byPriority).find(o => o.league === 'ML');
+    if (chosen) return finish({ decision: 'keep', name: full(rankText(chosen, 'PL')), chosen, reasons: why('レベル40超え') });
   }
 
   const qualified = ev.options.filter(o => o.qualifies).sort(byPriority);
   if (qualified.length) {
     const chosen = qualified[0];
-    return finish({ decision: 'keep', name: withExtras(rankText(chosen, chosen.league)), chosen,
-      reasons: [`${chosen.league}で${TOP}位以内`, ...(legacy.length ? ['レガシー技'] : []), ...special] });
+    return finish({ decision: 'keep', name: full(rankText(chosen)), chosen, reasons: why(`${chosen.league}で${TOP}位以内`) });
   }
 
   // Not in any league.
-  const old = year != null && year <= OLD_YEAR;
-  if (marks || old) {
-    return finish({ decision: 'keep', name: marks + (old ? String(year) : ''), chosen: null,
-      reasons: [...special, ...(old ? [`${year}年に捕まえた`] : [])] });
+  if (old) {
+    return finish({ decision: 'trade', name: String(year), chosen: null, reasons: [`${year}年に捕まえた（交換候補）`, ...special] });
   }
-  if (special.length) {
-    const chosen = bestFit()[0];
-    return finish({ decision: 'keep', name: chosen ? rankText(chosen, chosen.league) : '', chosen, reasons: special });
+  const strong = special.filter(r => !['色違い', 'XXL', 'XXS'].includes(r));
+  if (legacy.length || strong.length) {
+    const chosen = fitting.slice().sort(byRank)[0];
+    const base = chosen ? rankText(chosen) : '';
+    return finish({ decision: 'keep', name: base + legacyText + marks, chosen,
+      reasons: [...(legacy.length ? ['レガシー技'] : []), ...special, ...(chosen ? [`いちばん良いのは${chosen.league}`] : [])] });
   }
+  if (marks) return finish({ decision: 'keep', name: marks, chosen: null, reasons: special });
   return finish({ decision: 'transfer', name: p.name, keepName: true, chosen: null,
     reasons: [`どのリーグでも${TOP}位以内に入らない`] });
 }

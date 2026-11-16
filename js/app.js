@@ -50,6 +50,10 @@ function judgeBlock(p) {
     head = `<span class="verdict v-keep">残す</span>
       ${d.name ? `<span class="nick">${esc(d.name)}</span><button class="copy" data-copy="${esc(d.name)}">コピー</button>` : ''}
       <span class="muted small">${esc(d.reasons.join('・'))}${d.chosen && d.chosen.stage > 0 ? `（${esc(d.chosen.sp.ja)}に進化）` : ''}</span>`;
+  } else if (d.decision === 'trade') {
+    head = `<span class="verdict v-trade">交換候補</span>
+      <span class="nick">${esc(d.name)}</span><button class="copy" data-copy="${esc(d.name)}">コピー</button>
+      <span class="muted small">${esc(d.reasons.join('・'))}</span>`;
   } else if (d.decision === 'transfer') {
     head = `<span class="verdict v-transfer">送る候補</span><span class="muted small">名前はそのまま・${esc(d.reasons.join('・'))}</span>`;
   } else {
