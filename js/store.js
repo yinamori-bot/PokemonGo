@@ -61,6 +61,10 @@ export async function importRows(rows, fileName, existing) {
   return imp;
 }
 
+export async function savePokemon(p) {
+  await db.putMany('pokemon', [p]);
+}
+
 export async function exportBackup() {
   const { pokemon, imports } = await loadState();
   return { app: 'pogo-genie-app', version: 1, exportedAt: new Date().toISOString(), pokemon, imports };

@@ -58,6 +58,14 @@
               <option value="dup">重複の疑い</option>
             </select>
           </label>
+          <label>判定
+            <select id="judgeFilter">
+              <option value="">すべて</option>
+              <option value="keep">残す</option>
+              <option value="transfer">送る候補</option>
+              <option value="unknown">判定できない</option>
+            </select>
+          </label>
         </div>
         <p id="count" class="muted"></p>
       </div>
@@ -114,6 +122,18 @@
 
     <!-- データ -->
     <section id="view-data" class="view" hidden>
+      <div class="panel">
+        <h2>判定の設定</h2>
+        <label>順位を計算するときの最大レベル
+          <select id="maxLevel">
+            <option value="40">40</option>
+            <option value="41">41（相棒ブースト）</option>
+            <option value="50">50</option>
+            <option value="51">51（相棒ブースト）</option>
+          </select>
+        </label>
+        <p class="muted small">Poke Genieの設定と同じにすると、順位がPoke Genieの表示と一致します。</p>
+      </div>
       <div class="panel">
         <h2>バックアップ</h2>
         <p class="muted">データはこの端末のブラウザに保存されています。スマホとPCでデータを移すときや、念のための保存に使います。</p>

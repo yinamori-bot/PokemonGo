@@ -12,6 +12,26 @@ Poke GenieのCSVを取り込んで、手持ちのポケモンをリーグ別の�
 - 同じCSVを何度取り込んでも、同じ個体が重複して登録されることはありません。
 - スマホとPCの間でデータを移すときは、「データ」タブのバックアップと復元を使います。
 
+## 残す・送るの判定と名前
+
+1. どこかのリーグ・カップで50位以内に入れば「残す」。進化後の順位も見るが、進化後も今のレベルでCP上限に収まる必要がある。
+2. 複数で50位以内なら、いちばん進化した形を優先。同じ進化段階なら ML > HL > SL > LC の順。
+3. 名前は `ML③` のようにリーグ＋丸数字。シャドウがMLに入る場合は `ML239→㊵`（今の順位→リトレーン後の順位）。
+4. 色違い・ダイマックス・キョダイマックス・でんせつ・まぼろし・フィールド効果は無条件で残す。50位以内に入らない場合、色違いは `＊`、それ以外は `ML123`（1000位以下は `999+`）。
+5. リトルカップは、まだ進化しておらず、これから進化できるポケモンだけが対象。
+
+色違い・ダイマックス・キョダイマックス・フィールド効果はCSVに出ないため、カードのボタンで手動で印をつける。
+
+順位はPvPokeと同じ方法で計算する（CP上限以下の最も高いレベルでのステータス積の順位。同じ値は同じ順位）。最大レベルは「データ」タブで設定でき、初期値はPoke Genieの設定に合わせて40。
+
+## ゲームデータの更新
+
+```
+curl -o gm.json https://raw.githubusercontent.com/pvpoke/pvpoke/master/src/data/gamemaster.json
+curl -o names.csv https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_species_names.csv
+python3 tools/build_data.py gm.json names.csv data/pokedex.json
+```
+
 ## ローカルで動かす
 
 ```
@@ -36,6 +56,11 @@ CSVとバックアップのJSONは `.gitignore` で除外しています。コ�
 - `index.html`, `css/style.css`：画面
 - `js/csv.js`：CSVの読み込み
 - `js/pokegenie.js`：Poke Genieの列の対応づけ、個体の判定キー
+- `js/ranking.js`：個体値ランキングの計算
+- `js/dex.js`：ポケモンの種類・進化の情報
+- `js/naming.js`：残す・送るの判定と名前
+- `js/compare.js`：最近捕まえたポケモンと手持ちの比較
+- `data/pokedex.json`：ゲームデータ（PvPoke・PokeAPIから生成）
 - `js/store.js`：手持ちデータへの統合、バックアップ
 - `js/db.js`：IndexedDB
 - `sw.js`, `manifest.webmanifest`：ホーム画面への追加とオフライン対応

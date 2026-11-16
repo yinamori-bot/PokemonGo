@@ -2,11 +2,23 @@ import { csvToObjects } from './csv.js';
 import { LEAGUES, SHADOW_LABEL, validateHeader } from './pokegenie.js';
 import * as store from './store.js';
 import { buildGroups, pickRecent, compareOne } from './compare.js';
+import { initDex } from './dex.js';
+import { decide, FLAG_DEFS, LEAGUE_ORDER, TOP } from './naming.js';
+import { LEAGUE_DEFS } from './ranking.js';
 
 const $ = s => document.querySelector(s);
 const PAGE = 60;
 let state = { pokemon: [], imports: [] };
 let shown = PAGE;
+let settings = { maxLevel: 40 };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('settings') || '{}')); } catch {}
+let dexReady = false;
+const decisions = new Map();
+const judge = p => {
+  if (!dexReady) return { decision: 'unknown', error: '読み込み中', reasons: [], options: [] };
+  if (!decisions.has(p.id)) decisions.set(p.id, decide(p, settings));
+  return decisions.get(p.id);
+};
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmtDate = d => d ? d.replace('T', ' ') : '';
@@ -26,6 +38,56 @@ function showView(name) {
 }
 document.querySelectorAll('[data-view],[data-goto]').forEach(b =>
   b.addEventListener('click', () => showView(b.dataset.view || b.dataset.goto)));
+
+// ---- judgement (keep / transfer + nickname) ------------------------------
+function judgeBlock(p) {
+  const d = judge(p);
+  const flags = p.flags || {};
+  const chips = FLAG_DEFS.map(f =>
+    `<button class="flag ${flags[f.key] ? 'on' : ''}" data-flag="${f.key}" data-id="${esc(p.id)}" aria-pressed="${!!flags[f.key]}">${f.label}</button>`).join('');
+  let head;
+  if (d.decision === 'keep') {
+    head = `<span class="verdict v-keep">残す</span>
+      ${d.name ? `<span class="nick">${esc(d.name)}</span><button class="copy" data-copy="${esc(d.name)}">コピー</button>` : ''}
+      <span class="muted small">${esc(d.reasons.join('・'))}${d.chosen && d.chosen.stage > 0 ? `（${esc(d.chosen.sp.ja)}に進化）` : ''}</span>`;
+  } else if (d.decision === 'transfer') {
+    head = `<span class="verdict v-transfer">送る候補</span><span class="muted small">${esc(d.reasons.join('・'))}</span>`;
+  } else {
+    head = `<span class="verdict v-unknown">判定できません</span><span class="muted small">${esc(d.error || '')}</span>`;
+  }
+  const rows = (d.options || []).slice().sort((a, b) => a.stage - b.stage || LEAGUE_ORDER.indexOf(a.league) - LEAGUE_ORDER.indexOf(b.league))
+    .map(o => `<tr class="${o === d.chosen ? 'self' : ''}${o.fits ? '' : ' nofit'}"><td class="nm">${esc(o.sp.ja)}</td><td>${o.league}</td>
+      <td>${o.rank}位${o.purifiedRank != null ? `→${o.purifiedRank}位` : ''}</td><td>${o.fits ? (o.rank <= TOP || (o.purifiedRank ?? 99) <= TOP ? '◎' : '') : 'CP超過'}</td></tr>`).join('');
+  return `<div class="judge">
+    <div class="judge-head">${head}</div>
+    <div class="flags">${chips}</div>
+    ${rows ? `<details class="opts"><summary>リーグ別の順位（進化後を含む）</summary>
+      <table class="mtable"><thead><tr><th>ポケモン</th><th>リーグ</th><th>順位</th><th></th></tr></thead><tbody>${rows}</tbody></table></details>` : ''}
+  </div>`;
+}
+
+document.addEventListener('click', async e => {
+  const c = e.target.closest('[data-copy]');
+  if (c) {
+    const text = c.dataset.copy;
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch {} t.remove();
+    }
+    toast(`「${text}」をコピーしました`);
+    return;
+  }
+  const f = e.target.closest('[data-flag]');
+  if (f) {
+    const p = state.pokemon.find(x => x.id === f.dataset.id);
+    if (!p) return;
+    p.flags = { ...(p.flags || {}), [f.dataset.flag]: !(p.flags?.[f.dataset.flag]) };
+    decisions.delete(p.id);
+    await store.savePokemon(p);
+    renderList(); renderCompare();
+  }
+});
 
 // ---- list -------------------------------------------------------------
 function rankClass(rank) {
@@ -55,6 +117,8 @@ function filtered() {
   if (kind === 'lucky') list = list.filter(p => p.lucky);
   if (kind === 'hundo') list = list.filter(p => p.atk === 15 && p.def === 15 && p.sta === 15);
   if (kind === 'dup') list = list.filter(p => p.possibleDuplicate);
+  const jd = $('#judgeFilter').value;
+  if (jd) list = list.filter(p => judge(p).decision === jd);
   if (topN) {
     list = list.filter(p => leagueSort
       ? (p.leagues[leagueSort]?.rank ?? Infinity) <= topN
@@ -98,6 +162,7 @@ function card(p) {
       <span>Lv <b>${lv ?? '?'}</b></span>
       <span>捕まえた日 <b>${p.catchDate || '不明'}</b></span>
     </div>
+    ${judgeBlock(p)}
     <div class="leagues">${leagues}</div>
     ${moves ? `<div class="moves">${esc(moves)}</div>` : ''}
   </li>`;
@@ -111,16 +176,16 @@ function renderList() {
   $('#list').innerHTML = list.slice(0, shown).map(card).join('');
   $('#more').hidden = list.length <= shown;
 }
-['#q', '#sort', '#topN', '#kind'].forEach(s => $(s).addEventListener('input', () => { shown = PAGE; renderList(); saveFilters(); }));
+['#q', '#sort', '#topN', '#kind', '#judgeFilter'].forEach(s => $(s).addEventListener('input', () => { shown = PAGE; renderList(); saveFilters(); }));
 $('#more').addEventListener('click', () => { shown += PAGE; renderList(); });
 
 function saveFilters() {
-  try { localStorage.setItem('filters', JSON.stringify({ sort: $('#sort').value, topN: $('#topN').value, kind: $('#kind').value })); } catch {}
+  try { localStorage.setItem('filters', JSON.stringify({ sort: $('#sort').value, topN: $('#topN').value, kind: $('#kind').value, judgeFilter: $('#judgeFilter').value })); } catch {}
 }
 function loadFilters() {
   try {
     const f = JSON.parse(localStorage.getItem('filters') || '{}');
-    for (const k of ['sort', 'topN', 'kind']) if (f[k] != null) $(`#${k}`).value = f[k];
+    for (const k of ['sort', 'topN', 'kind', 'judgeFilter']) if (f[k] != null) $(`#${k}`).value = f[k];
   } catch {}
 }
 
@@ -173,6 +238,7 @@ function renderCompare() {
       <div class="card-head"><span class="card-name">${esc(p.name)}</span><span class="dex">No.${p.dex}</span>${badges.join('')}
         <span class="card-cp">CP ${p.cp ?? '?'}</span></div>
       <div class="stats"><span>個体値 <b>${p.atk}/${p.def}/${p.sta}</b>（${p.ivPct ?? '?'}%）</span><span>捕まえた日 <b>${p.catchDate || '不明'}</b></span></div>
+      ${judgeBlock(p)}
       ${compareOne(p, groups).map(r => cmpLeague(r, p)).join('')}
     </li>`;
   }).join('');
@@ -198,7 +264,7 @@ async function handleCSV(file) {
     const missing = validateHeader(header);
     if (missing.length) throw new Error(`Poke GenieのCSVではないようです（見つからない列：${missing.join('、')}）`);
     const imp = await store.importRows(records, file.name, state.pokemon);
-    state = await store.loadState();
+    state = await store.loadState(); decisions.clear();
     out.innerHTML = `<div class="result">${records.length}匹を読み込みました。<br>
       新規 ${imp.added}匹・更新 ${imp.updated}匹・変化なし ${imp.unchanged}匹${imp.dupInFile ? `<br>重複の疑い ${imp.dupInFile}件（手持ちタブの「種別：重複の疑い」で確認できます）` : ''}</div>`;
     renderAll();
@@ -230,15 +296,23 @@ $('#restore').addEventListener('change', async e => {
     const data = JSON.parse(await f.text());
     if (!confirm(`今のデータを消して、バックアップ（${data.pokemon?.length ?? 0}匹）で置き換えます。よろしいですか？`)) return;
     await store.restoreBackup(data);
-    state = await store.loadState();
+    state = await store.loadState(); decisions.clear();
     renderAll(); toast('復元しました');
   } catch (err) { alert(err.message); }
 });
 $('#wipe').addEventListener('click', async () => {
   if (!confirm('この端末のデータをすべて削除します。よろしいですか？')) return;
   await store.clearAll();
-  state = await store.loadState();
+  state = await store.loadState(); decisions.clear();
   renderAll(); toast('削除しました');
+});
+
+// ---- settings -----------------------------------------------------------
+$('#maxLevel').value = String(settings.maxLevel);
+$('#maxLevel').addEventListener('input', () => {
+  settings.maxLevel = Number($('#maxLevel').value);
+  try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {}
+  decisions.clear(); renderAll(); toast('判定をやり直しました');
 });
 
 // ---- boot -------------------------------------------------------------
@@ -248,8 +322,12 @@ function renderAll() { renderList(); renderCompare(); renderHistory(); }
   loadFilters();
   try { const r = localStorage.getItem('recent'); if (r) $('#recent').value = r; } catch {}
   try { const v = localStorage.getItem('view'); if (v) showView(v); } catch {}
-  state = await store.loadState();
+  state = await store.loadState(); decisions.clear();
   renderAll();
+  try {
+    initDex(await (await fetch('data/pokedex.json')).json());
+    dexReady = true; decisions.clear(); renderAll();
+  } catch (e) { toast('ポケモンのデータを読み込めませんでした'); }
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
