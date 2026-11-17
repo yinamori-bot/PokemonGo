@@ -78,3 +78,7 @@ CSVとバックアップのJSONは `.gitignore` で除外しています。コ�
 - `js/store.js`：手持ちデータへの統合、バックアップ
 - `js/db.js`：IndexedDB
 - `sw.js`, `manifest.webmanifest`：ホーム画面への追加とオフライン対応
+
+## 別アプリ
+
+- [yt-digest](https://github.com/yinamori-bot/yt-digest)：YouTube新着ダイジェスト（別のリポジトリに移しました）
