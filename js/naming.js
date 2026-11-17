@@ -15,7 +15,7 @@
 //  - year: caught in 2017 or earlier (ML③2017).
 //
 // Not in any league
-//  - caught in 2017 or earlier          -> trade candidate, name = year (2017)
+//  - caught in 2017 or earlier          -> trade candidate, name = marks + year (2017, ＊2017)
 //  - legacy move / Dynamax / Gigantamax / legendary / mythical / background
 //                                        -> keep, best rank anywhere (ML128ガ)
 //  - shiny / XXL / XXS only              -> keep, ＊ / XXL / XXS
@@ -157,7 +157,7 @@ export function decide(p, settings) {
 
   // Not in any league.
   if (old) {
-    return finish({ decision: 'trade', name: String(year), chosen: null, reasons: [`${year}年に捕まえた（交換候補）`, ...special] });
+    return finish({ decision: 'trade', name: marks + String(year), chosen: null, reasons: [`${year}年に捕まえた（交換候補）`, ...special] });
   }
   const strong = special.filter(r => !['色違い', 'XXL', 'XXS'].includes(r));
   if (legacy.length || strong.length) {

@@ -1,5 +1,5 @@
 // Offline cache: network first, fall back to cache (so updates show up right away).
-const CACHE = 'pogo-v5';
+const CACHE = 'pogo-v6';
 const ASSETS = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/csv.js', 'js/db.js', 'js/pokegenie.js', 'js/store.js', 'js/compare.js', 'js/dex.js', 'js/ranking.js', 'js/naming.js', 'data/pokedex.json', 'manifest.webmanifest', 'icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
