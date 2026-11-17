@@ -81,4 +81,4 @@ CSVとバックアップのJSONは `.gitignore` で除外しています。コ�
 
 ## 別アプリ
 
-- [`yt-digest/`](yt-digest/README.md)：YouTube新着ダイジェスト（登録チャンネルの新着を、知らない情報だけに絞って要約・読み上げ）
+- [yt-digest](https://github.com/yinamori-bot/yt-digest)：YouTube新着ダイジェスト（別のリポジトリに移しました）
